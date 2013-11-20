@@ -2,6 +2,7 @@ import os
 import datetime
 import httplib
 import sys
+import traceback
 
 try:
     import json
@@ -30,7 +31,6 @@ def _report_raw(event, dsn=None):
     conntype = {'http': httplib.HTTPConnection,
                 'https': httplib.HTTPSConnection}[proto]
     conn = conntype(host)
-    conn.set_debuglevel(3)
     conn.request('POST', '/api/' + path + '/store/',
                  body=data, headers={
                      'X-Sentry-Auth': 'Sentry sentry_version=4,'
@@ -42,8 +42,6 @@ def _report_raw(event, dsn=None):
     code = resp.status
     if code != 200:
         raise RavenError('Failure %s - %r' % (code, resp.reason))
-
-    print 'response', code, repr(resp.read())
 
 def report(message, level='error', dsn=None, **kwargs):
     event = dict(kwargs,
@@ -69,6 +67,16 @@ def _format_exc(tb):
 
     return frames
 
+def _dont_crash(func):
+    def dont_crash_wrap(*args, **kwargs):
+        try:
+            func(*args, **kwargs)
+        except Exception:
+            traceback.print_exc()
+
+    return dont_crash_wrap
+
+@_dont_crash
 def report_exception(exc=None, traceback=None, **kwargs):
     if not traceback:
         traceback = sys.exc_info()[2]
